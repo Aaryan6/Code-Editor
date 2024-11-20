@@ -35,7 +35,9 @@ type TestResult = {
 export default function CodeEditor() {
   const [language, setLanguage] = useState("javascript");
   const [theme, setTheme] = useState("vs-light");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(`function twoSum(nums, target) {
+  // Your code here
+}`);
   const [output, setOutput] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [resultBoxHeight, setResultBoxHeight] = useState(200);
@@ -58,32 +60,39 @@ export default function CodeEditor() {
     setOutput([]);
   };
 
-  const runCode = async () => {
-    setIsRunning(true);
-    setOutput([]);
+const runCode = async () => {
+  setIsRunning(true);
+  setOutput([]);
 
-    const results = await Promise.all(
-      problemData.testCases.map(async (testCase) => {
-        try {
-          const yourOutput = await executeCode(code, language, testCase.input);
-          return {
-            input: testCase.input,
-            yourOutput,
-            expectedOutput: testCase.expectedOutput,
-          };
-        } catch (error) {
+  const results = await Promise.all(
+    problemData.testCases.map(async (testCase) => {
+      try {
+        const yourOutput = await executeCode(code, language, testCase.input);
+        return {
+          input: testCase.input,
+          yourOutput,
+          expectedOutput: testCase.expectedOutput,
+        };
+      } catch (error) {
+        if (error instanceof Error) {
           return {
             input: testCase.input,
             yourOutput: `Error: ${error.message}`,
             expectedOutput: testCase.expectedOutput,
           };
         }
-      })
-    );
+        return {
+          input: testCase.input,
+          yourOutput: "Error: Unknown error occurred",
+          expectedOutput: testCase.expectedOutput,
+        };
+      }
+    })
+  );
 
-    setOutput(results);
-    setIsRunning(false);
-  };
+  setOutput(results);
+  setIsRunning(false);
+};
 
   const executeCode = async (code: string, language: string, input: string): Promise<string> => {
     if (language === "javascript") {
