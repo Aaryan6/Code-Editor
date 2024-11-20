@@ -3,11 +3,18 @@
 import { useState, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PlayIcon, SendIcon, RotateCcwIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { problemData } from "@/data/problemData";
 import { Resizable } from "re-resizable";
+import { analyzeCodeWithAI } from "@/app/actions";
 
 const languageOptions = [
   { value: "javascript", label: "JavaScript" },
@@ -30,6 +37,8 @@ type TestResult = {
   input: string;
   yourOutput: string;
   expectedOutput: string;
+  isCorrect?: boolean;
+  analysis?: string;
 };
 
 export default function CodeEditor() {
@@ -37,6 +46,7 @@ export default function CodeEditor() {
   const [theme, setTheme] = useState("vs-light");
   const [code, setCode] = useState(`function twoSum(nums, target) {
   // Your code here
+  return [];
 }`);
   const [output, setOutput] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -48,7 +58,18 @@ export default function CodeEditor() {
 
   const handleLanguageChange = useCallback((value: string) => {
     setLanguage(value);
-    setCode("");
+    if (value === "python") {
+      setCode(`def two_sum(nums, target):
+    # Your code here
+    return []`);
+    } else if (value === "javascript") {
+      setCode(`function twoSum(nums, target) {
+  // Your code here
+  return [];
+}`);
+    } else {
+      setCode("");
+    }
   }, []);
 
   const handleThemeChange = useCallback((value: string) => {
@@ -60,52 +81,94 @@ export default function CodeEditor() {
     setOutput([]);
   };
 
-const runCode = async () => {
-    setIsRunning(true)
-    setOutput([])
+  const runCode = async () => {
+    setIsRunning(true);
+    setOutput([]);
 
     const results = await Promise.all(
       problemData.testCases.map(async (testCase) => {
         try {
-          const yourOutput = await executeCode(code, language, testCase.input)
-          return {
+          const yourOutput = await executeCode(code, language, testCase.input);
+          const result = {
             input: testCase.input,
             yourOutput,
             expectedOutput: testCase.expectedOutput,
+            isCorrect: yourOutput === testCase.expectedOutput,
+            analysis: "",
+          };
+
+          // If output is incorrect, get AI analysis using the server action
+          if (result.yourOutput !== result.expectedOutput) {
+            result.analysis = await analyzeCodeWithAI(code, {
+              input: testCase.input,
+              yourOutput: result.yourOutput,
+              expectedOutput: testCase.expectedOutput,
+            });
           }
+
+          return result;
         } catch (error) {
           return {
             input: testCase.input,
-            yourOutput: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+            yourOutput: `Error: ${
+              error instanceof Error ? error.message : "Unknown error occurred"
+            }`,
             expectedOutput: testCase.expectedOutput,
-          }
+            isCorrect: false,
+            analysis: "",
+          };
         }
       })
-    )
+    );
 
-    setOutput(results)
-    setIsRunning(false)
-  }
+    setOutput(results);
+    setIsRunning(false);
+  };
 
-  const executeCode = async (code: string, language: string, input: string): Promise<string> => {
-    if (language === "javascript") {
-      try {
-        const [nums, target] = JSON.parse(`[${input.replace(/\n/g, ",")}]`)
-        const result = eval(`
+  const executeCode = async (
+    code: string,
+    language: string,
+    input: string
+  ): Promise<string> => {
+    try {
+      const [nums, target] = JSON.parse(`[${input.replace(/\n/g, ",")}]`);
+
+      if (language === "javascript") {
+        return eval(`
           ${code}
-          twoSum(${JSON.stringify(nums)}, ${target})
-        `)
-        return JSON.stringify(result)
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`Execution error: ${error.message}`)
-        }
-        throw new Error('Unknown execution error occurred')
+          JSON.stringify(twoSum(${JSON.stringify(nums)}, ${target}));
+        `);
       }
+
+      if (language === "python") {
+        const response = await fetch("/api/execute-python", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            code,
+            input: { nums, target },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to execute Python code");
+        }
+
+        const result = await response.json();
+        return result.output;
+      }
+
+      // Placeholder for other languages
+      return `Execution for ${language} is not implemented yet.`;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Execution error: ${error.message}`);
+      }
+      throw new Error("Unknown execution error occurred");
     }
-    // Placeholder for other languages
-    return `Execution for ${language} is not implemented yet.`
-  }
+  };
 
   const submitCode = () => {
     toast({
@@ -162,7 +225,10 @@ const runCode = async () => {
             <PlayIcon className="w-4 h-4" />
             Run
           </Button>
-          <Button onClick={submitCode} className="gap-2 bg-blue-500 text-white hover:bg-blue-600">
+          <Button
+            onClick={submitCode}
+            className="gap-2 bg-blue-500 text-white hover:bg-blue-600"
+          >
             <SendIcon className="w-4 h-4" />
             Submit
           </Button>
@@ -199,23 +265,40 @@ const runCode = async () => {
       >
         <div className="border-t border-gray-200 bg-white overflow-y-auto h-full">
           <div className="p-4">
-            <h3 className="text-sm font-medium mb-2 text-gray-700">Test Results</h3>
+            <h3 className="text-sm font-medium mb-2 text-gray-700">
+              Test Results
+            </h3>
             <div className="space-y-4">
               {output.map((result, index) => (
-                <div key={index} className="text-sm font-mono p-2 rounded bg-gray-50">
+                <div
+                  key={index}
+                  className={`text-sm font-mono p-2 rounded ${
+                    result.isCorrect ? "bg-green-50" : "bg-red-50"
+                  }`}
+                >
                   <div className="mb-1">
                     <strong>Input:</strong> {result.input}
                   </div>
                   <div className="mb-1">
                     <strong>Your Output:</strong> {result.yourOutput}
                   </div>
-                  <div>
+                  <div className="mb-1">
                     <strong>Expected Output:</strong> {result.expectedOutput}
                   </div>
+                  {!result.isCorrect && result.analysis && (
+                    <div className="mt-3 p-3 bg-white rounded border border-red-200">
+                      <strong className="text-red-600">AI Analysis:</strong>
+                      <div className="mt-1 text-gray-700 whitespace-pre-wrap">
+                        {result.analysis}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {output.length === 0 && (
-                <div className="text-gray-500 text-sm">Run your code to see test results</div>
+                <div className="text-gray-500 text-sm">
+                  Run your code to see test results
+                </div>
               )}
             </div>
           </div>
