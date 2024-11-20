@@ -61,55 +61,51 @@ export default function CodeEditor() {
   };
 
 const runCode = async () => {
-  setIsRunning(true);
-  setOutput([]);
+    setIsRunning(true)
+    setOutput([])
 
-  const results = await Promise.all(
-    problemData.testCases.map(async (testCase) => {
-      try {
-        const yourOutput = await executeCode(code, language, testCase.input);
-        return {
-          input: testCase.input,
-          yourOutput,
-          expectedOutput: testCase.expectedOutput,
-        };
-      } catch (error) {
-        if (error instanceof Error) {
+    const results = await Promise.all(
+      problemData.testCases.map(async (testCase) => {
+        try {
+          const yourOutput = await executeCode(code, language, testCase.input)
           return {
             input: testCase.input,
-            yourOutput: `Error: ${error.message}`,
+            yourOutput,
             expectedOutput: testCase.expectedOutput,
-          };
+          }
+        } catch (error) {
+          return {
+            input: testCase.input,
+            yourOutput: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+            expectedOutput: testCase.expectedOutput,
+          }
         }
-        return {
-          input: testCase.input,
-          yourOutput: "Error: Unknown error occurred",
-          expectedOutput: testCase.expectedOutput,
-        };
-      }
-    })
-  );
+      })
+    )
 
-  setOutput(results);
-  setIsRunning(false);
-};
+    setOutput(results)
+    setIsRunning(false)
+  }
 
   const executeCode = async (code: string, language: string, input: string): Promise<string> => {
     if (language === "javascript") {
       try {
-        const [nums, target] = JSON.parse(`[${input.replace(/\n/g, ",")}]`);
+        const [nums, target] = JSON.parse(`[${input.replace(/\n/g, ",")}]`)
         const result = eval(`
           ${code}
           twoSum(${JSON.stringify(nums)}, ${target})
-        `);
-        return JSON.stringify(result);
+        `)
+        return JSON.stringify(result)
       } catch (error) {
-        throw new Error(`Execution error: ${error.message}`);
+        if (error instanceof Error) {
+          throw new Error(`Execution error: ${error.message}`)
+        }
+        throw new Error('Unknown execution error occurred')
       }
     }
     // Placeholder for other languages
-    return `Execution for ${language} is not implemented yet.`;
-  };
+    return `Execution for ${language} is not implemented yet.`
+  }
 
   const submitCode = () => {
     toast({
