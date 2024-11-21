@@ -30,7 +30,7 @@ Please provide:
 1. What's wrong with the current implementation
 2. Specific suggestions to fix the code
 3. A hint about the optimal approach (using a hash map)
-Keep the response concise and focused on helping the user improve their code.`;
+Keep the response short and concise and focused on helping the user improve their code.`;
 
   try {
     const { text } = await generateText({
