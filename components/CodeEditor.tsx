@@ -43,12 +43,11 @@ type TestResult = {
 };
 
 export default function CodeEditor() {
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("python");
   const [theme, setTheme] = useState("vs-light");
-  const [code, setCode] = useState(`function twoSum(nums, target) {
-  // Your code here
-  return [];
-}`);
+  const [code, setCode] = useState(`def two_sum(nums, target):
+    # Your code here
+    return []`);
   const [output, setOutput] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [resultBoxHeight, setResultBoxHeight] = useState(200);
@@ -86,74 +85,88 @@ export default function CodeEditor() {
     setIsRunning(true);
     setOutput([]);
 
-    const results = await Promise.all(
+    // First, execute all test cases and show outputs immediately
+    const initialResults = await Promise.all(
       problemData.testCases.map(async (testCase) => {
         try {
           const yourOutput = await executeCode(code, language, testCase.input);
-          const result = {
+          const isCorrect = yourOutput === testCase.expectedOutput;
+          return {
             input: testCase.input,
             yourOutput,
             expectedOutput: testCase.expectedOutput,
-            isCorrect: yourOutput === testCase.expectedOutput,
+            isCorrect,
             analysis: "",
-            analysisLoading: false,
+            // Set initial loading state for incorrect answers
+            analysisLoading: !isCorrect,
           };
-
-          // Show the output first
-          setOutput((prevOutput) => [...prevOutput, result]);
-
-          // If output is incorrect, get AI analysis
-          if (result.yourOutput !== result.expectedOutput) {
-            result.analysisLoading = true;
-            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]);
-
-            console.log("Sending to analyze-code:", {
-              code,
-              testCase: {
-                input: testCase.input,
-                yourOutput: result.yourOutput,
-                expectedOutput: testCase.expectedOutput,
-              },
-            });
-
-            const response = await fetch("/api/analyze-code", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                code,
-                testCase: {
-                  input: testCase.input,
-                  yourOutput: result.yourOutput,
-                  expectedOutput: testCase.expectedOutput,
-                },
-              }),
-            });
-
-            if (!response.ok) {
-              throw new Error(`Error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log("Analysis response:", data);
-
-            result.analysis = data.analysis;
-            result.analysisLoading = false;
-            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]);
-          }
-
-          return result;
         } catch (error) {
-          console.error("Test case error:", error);
           return {
             input: testCase.input,
             yourOutput: `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
             expectedOutput: testCase.expectedOutput,
             isCorrect: false,
             analysis: "",
-            analysisLoading: false,
+            analysisLoading: true,
           };
+        }
+      })
+    );
+
+    // Show all outputs immediately with loading states
+    setOutput(initialResults);
+
+    // Get all incorrect results
+    const incorrectResults = initialResults
+      .map((result, index) => ({ ...result, index }))
+      .filter((result) => !result.isCorrect);
+
+    // Process all analyses in parallel
+    await Promise.all(
+      incorrectResults.map(async (result) => {
+        try {
+          const response = await fetch("/api/analyze-code", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              code,
+              testCase: {
+                input: result.input,
+                yourOutput: result.yourOutput,
+                expectedOutput: result.expectedOutput,
+              },
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          // Update the specific result with analysis
+          setOutput((prevResults) => {
+            const newResults = [...prevResults];
+            newResults[result.index] = {
+              ...prevResults[result.index],
+              analysis: data.analysis,
+              analysisLoading: false,
+            };
+            return newResults;
+          });
+        } catch (error) {
+          // Handle error for this specific analysis
+          setOutput((prevResults) => {
+            const newResults = [...prevResults];
+            newResults[result.index] = {
+              ...prevResults[result.index],
+              analysis: "Failed to get AI analysis",
+              analysisLoading: false,
+            };
+            return newResults;
+          });
         }
       })
     );
