@@ -96,22 +96,33 @@ export default function CodeEditor() {
             expectedOutput: testCase.expectedOutput,
             isCorrect: yourOutput === testCase.expectedOutput,
             analysis: "",
-            analysisLoading: false, // Initially not loading
+            analysisLoading: false,
           };
+
           // Show the output first
           setOutput((prevOutput) => [...prevOutput, result]);
 
-          // If output is incorrect, get AI analysis using the server action
+          // If output is incorrect, get AI analysis
           if (result.yourOutput !== result.expectedOutput) {
-            result.analysisLoading = true; // Set loading state
-            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]); // Update the loading state
+            result.analysisLoading = true;
+            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]);
+
+            console.log("Sending to analyze-code:", {
+              code,
+              testCase: {
+                input: testCase.input,
+                yourOutput: result.yourOutput,
+                expectedOutput: testCase.expectedOutput,
+              },
+            });
+
             const response = await fetch("/api/analyze-code", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                code: code,
+                code,
                 testCase: {
                   input: testCase.input,
                   yourOutput: result.yourOutput,
@@ -125,19 +136,19 @@ export default function CodeEditor() {
             }
 
             const data = await response.json();
+            console.log("Analysis response:", data);
 
             result.analysis = data.analysis;
-            result.analysisLoading = false; // Done loading
-            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]); // Update with the final analysis
+            result.analysisLoading = false;
+            setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]);
           }
 
           return result;
         } catch (error) {
+          console.error("Test case error:", error);
           return {
             input: testCase.input,
-            yourOutput: `Error: ${
-              error instanceof Error ? error.message : "Unknown error occurred"
-            }`,
+            yourOutput: `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
             expectedOutput: testCase.expectedOutput,
             isCorrect: false,
             analysis: "",
@@ -183,12 +194,12 @@ export default function CodeEditor() {
   };
 
   return (
-    <div className='flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden shadow-lg'>
-      <div className='flex items-center justify-between p-4 border-b border-gray-200 bg-white'>
-        <div className='flex gap-2 items-center'>
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden shadow-lg">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+        <div className="flex gap-2 items-center">
           <Select value={language} onValueChange={handleLanguageChange}>
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue placeholder='Select Language' />
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Language" />
             </SelectTrigger>
             <SelectContent>
               {languageOptions.map((option) => (
@@ -200,8 +211,8 @@ export default function CodeEditor() {
           </Select>
 
           <Select value={theme} onValueChange={handleThemeChange}>
-            <SelectTrigger className='w-[180px]'>
-              <SelectValue placeholder='Select Theme' />
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Theme" />
             </SelectTrigger>
             <SelectContent>
               {themeOptions.map((option) => (
@@ -212,37 +223,37 @@ export default function CodeEditor() {
             </SelectContent>
           </Select>
         </div>
-        <div className='flex gap-2'>
+        <div className="flex gap-2">
           <Button
-            variant='outline'
+            variant="outline"
             onClick={resetCode}
-            className='gap-2 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-700'
-            aria-label='Reset code'
+            className="gap-2 bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-700"
+            aria-label="Reset code"
           >
-            <RotateCcwIcon className='w-4 h-4' />
+            <RotateCcwIcon className="w-4 h-4" />
           </Button>
           <Button
-            variant='outline'
+            variant="outline"
             onClick={runCode}
             disabled={isRunning}
-            className='gap-2 bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700'
+            className="gap-2 bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700"
           >
-            <PlayIcon className='w-4 h-4' />
+            <PlayIcon className="w-4 h-4" />
             Run
           </Button>
           <Button
             onClick={submitCode}
-            className='gap-2 bg-blue-500 text-white hover:bg-blue-600'
+            className="gap-2 bg-blue-500 text-white hover:bg-blue-600"
           >
-            <SendIcon className='w-4 h-4' />
+            <SendIcon className="w-4 h-4" />
             Submit
           </Button>
         </div>
       </div>
 
-      <div className='flex-1 overflow-hidden'>
+      <div className="flex-1 overflow-hidden">
         <Editor
-          height='100%'
+          height="100%"
           language={language}
           value={code}
           theme={theme}
@@ -268,12 +279,12 @@ export default function CodeEditor() {
         maxHeight={500}
         enable={{ top: true }}
       >
-        <div className='border-t border-gray-200 bg-white overflow-y-auto h-full'>
-          <div className='p-4'>
-            <h3 className='text-sm font-medium mb-2 text-gray-700'>
+        <div className="border-t border-gray-200 bg-white overflow-y-auto h-full">
+          <div className="p-4">
+            <h3 className="text-sm font-medium mb-2 text-gray-700">
               Test Results
             </h3>
-            <div className='space-y-4'>
+            <div className="space-y-4">
               {output.map((result, index) => (
                 <div
                   key={index}
@@ -281,28 +292,28 @@ export default function CodeEditor() {
                     result.isCorrect ? "bg-green-50" : "bg-red-50"
                   }`}
                 >
-                  <div className='mb-1'>
+                  <div className="mb-1">
                     <strong>Input:</strong> {result.input}
                   </div>
-                  <div className='mb-1'>
+                  <div className="mb-1">
                     <strong>Your Output:</strong> {result.yourOutput}
                   </div>
-                  <div className='mb-1'>
+                  <div className="mb-1">
                     <strong>Expected Output:</strong> {result.expectedOutput}
                   </div>
                   {!result.isCorrect && (
-                    <div className='mt-3 p-3 bg-white rounded border border-red-200'>
-                      <div className='mt-1 text-gray-700 whitespace-pre-wrap'>
+                    <div className="mt-3 p-3 bg-white rounded border border-red-200">
+                      <div className="mt-1 text-gray-700 whitespace-pre-wrap">
                         {result.analysisLoading ? (
-                          <div className='text-gray-500 flex space-x-2 items-center'>
-                            <strong className='text-red-600'>
+                          <div className="text-gray-500 flex space-x-2 items-center">
+                            <strong className="text-red-600">
                               AI Analysis:
                             </strong>{" "}
-                            <Loader className='animate-spin w-4 h-4' />
+                            <Loader className="animate-spin w-4 h-4" />
                           </div>
                         ) : (
                           <div>
-                            <strong className='text-red-600'>
+                            <strong className="text-red-600">
                               AI Analysis:
                             </strong>
                             <Markdown>{result.analysis || ""}</Markdown>
@@ -314,7 +325,7 @@ export default function CodeEditor() {
                 </div>
               ))}
               {output.length === 0 && (
-                <div className='text-gray-500 text-sm'>
+                <div className="text-gray-500 text-sm">
                   Run your code to see test results
                 </div>
               )}
