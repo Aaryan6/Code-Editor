@@ -14,7 +14,7 @@ import { PlayIcon, SendIcon, RotateCcwIcon, Loader } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { problemData } from "@/data/problemData";
 import { Resizable } from "re-resizable";
-import { analyzeCodeWithAI } from "@/app/actions";
+// import { analyzeCodeWithAI } from "@/app/actions";
 import Markdown from "react-markdown";
 
 const languageOptions = [
@@ -98,7 +98,6 @@ export default function CodeEditor() {
             analysis: "",
             analysisLoading: false, // Initially not loading
           };
-
           // Show the output first
           setOutput((prevOutput) => [...prevOutput, result]);
 
@@ -106,14 +105,28 @@ export default function CodeEditor() {
           if (result.yourOutput !== result.expectedOutput) {
             result.analysisLoading = true; // Set loading state
             setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]); // Update the loading state
-
-            const analysis = await analyzeCodeWithAI(code, {
-              input: testCase.input,
-              yourOutput: result.yourOutput,
-              expectedOutput: testCase.expectedOutput,
+            const response = await fetch("/api/analyze-code", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                code: code,
+                testCase: {
+                  input: testCase.input,
+                  yourOutput: result.yourOutput,
+                  expectedOutput: testCase.expectedOutput,
+                },
+              }),
             });
 
-            result.analysis = analysis;
+            if (!response.ok) {
+              throw new Error(`Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            result.analysis = data.analysis;
             result.analysisLoading = false; // Done loading
             setOutput((prevOutput) => [...prevOutput.slice(0, -1), result]); // Update with the final analysis
           }
